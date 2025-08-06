@@ -8,6 +8,7 @@ export function useSupabaseData() {
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([])
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Load initial data
   useEffect(() => {
@@ -17,29 +18,45 @@ export function useSupabaseData() {
   // Set up real-time subscriptions
   useEffect(() => {
     const studentsSubscription = supabase
-      .channel('students')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => {
+      .channel('students_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'students' 
+      }, () => {
         loadStudents()
       })
       .subscribe()
 
     const coursesSubscription = supabase
-      .channel('courses')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => {
+      .channel('courses_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'courses' 
+      }, () => {
         loadCourses()
       })
       .subscribe()
 
     const sessionsSubscription = supabase
-      .channel('attendance_sessions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_sessions' }, () => {
+      .channel('sessions_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'attendance_sessions' 
+      }, () => {
         loadAttendanceSessions()
       })
       .subscribe()
 
     const recordsSubscription = supabase
-      .channel('attendance_records')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_records' }, () => {
+      .channel('records_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'attendance_records' 
+      }, () => {
         loadAttendanceRecords()
       })
       .subscribe()
@@ -54,13 +71,20 @@ export function useSupabaseData() {
 
   const loadAllData = async () => {
     setLoading(true)
-    await Promise.all([
-      loadStudents(),
-      loadCourses(),
-      loadAttendanceSessions(),
-      loadAttendanceRecords()
-    ])
-    setLoading(false)
+    setError(null)
+    try {
+      await Promise.all([
+        loadStudents(),
+        loadCourses(),
+        loadAttendanceSessions(),
+        loadAttendanceRecords()
+      ])
+    } catch (err: any) {
+      setError(err.message)
+      console.error('Error loading data:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const loadStudents = async () => {
@@ -82,7 +106,7 @@ export function useSupabaseData() {
       email: student.email,
       department: student.department,
       level: student.level,
-      phoneNumber: student.phone_number,
+      phoneNumber: student.phone_number || '',
       createdAt: student.created_at
     }))
 
@@ -237,7 +261,7 @@ export function useSupabaseData() {
     if (updates.endTime) updateData.end_time = updates.endTime
     if (updates.qrCode) updateData.qr_code = updates.qrCode
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive
-    if (updates.location) updateData.location = updates.location
+    if (updates.location !== undefined) updateData.location = updates.location
 
     const { error } = await supabase
       .from('attendance_sessions')
@@ -268,17 +292,84 @@ export function useSupabaseData() {
     }
   }
 
+  const initializeDefaultData = async () => {
+    try {
+      // Check if data already exists
+      const { data: existingStudents } = await supabase
+        .from('students')
+        .select('id')
+        .limit(1)
+
+      if (existingStudents && existingStudents.length > 0) {
+        console.log('Default data already exists')
+        return
+      }
+
+      // Import default data
+      const { defaultStudents, defaultCourses } = await import('../data/defaultData')
+
+      // Insert students
+      const studentsData = defaultStudents.map(student => ({
+        matric_number: student.matricNumber,
+        first_name: student.firstName,
+        last_name: student.lastName,
+        email: student.email,
+        department: student.department,
+        level: student.level,
+        phone_number: student.phoneNumber
+      }))
+
+      const { error: studentsError } = await supabase
+        .from('students')
+        .insert(studentsData)
+
+      if (studentsError) {
+        console.error('Error inserting students:', studentsError)
+        throw studentsError
+      }
+
+      // Insert courses
+      const coursesData = defaultCourses.map(course => ({
+        code: course.code,
+        title: course.title,
+        credit_unit: course.creditUnit,
+        lecturer: course.lecturer,
+        department: course.department,
+        level: course.level,
+        semester: course.semester,
+        session: course.session
+      }))
+
+      const { error: coursesError } = await supabase
+        .from('courses')
+        .insert(coursesData)
+
+      if (coursesError) {
+        console.error('Error inserting courses:', coursesError)
+        throw coursesError
+      }
+
+      console.log('Default data initialized successfully')
+      await loadAllData()
+    } catch (error) {
+      console.error('Error initializing default data:', error)
+      throw error
+    }
+  }
+
   return {
     students,
     courses,
     attendanceSessions,
     attendanceRecords,
     loading,
+    error,
     addStudent,
     addCourse,
     createSession,
     updateSession,
     markAttendance,
+    initializeDefaultData,
     refreshData: loadAllData
   }
 }

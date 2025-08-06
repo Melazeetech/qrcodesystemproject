@@ -10,42 +10,85 @@ import ReportsPage from './components/ReportsPage';
 import HowToUse from './components/HowToUse';
 import TestingHelper from './components/TestingHelper';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { useSharedStorage } from './hooks/useSharedStorage';
+import { useSupabaseData } from './hooks/useSupabaseData';
 import { Student, Course, AttendanceSession, AttendanceRecord, User } from './types';
-import { defaultStudents, defaultCourses } from './data/defaultData';
 
 function App() {
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('fcfj-current-user', null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showHowToUse, setShowHowToUse] = useState(false);
   const [showTesting, setShowTesting] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
-  // Data management with localStorage
-  const [students, setStudents] = useSharedStorage<Student[]>('fcfj-students', []);
-  const [courses, setCourses] = useSharedStorage<Course[]>('fcfj-courses', []);
-  const [attendanceSessions, setAttendanceSessions] = useSharedStorage<AttendanceSession[]>('fcfj-sessions', []);
-  const [attendanceRecords, setAttendanceRecords] = useSharedStorage<AttendanceRecord[]>('fcfj-records', []);
+  // Data management with Supabase
+  const {
+    students,
+    courses,
+    attendanceSessions,
+    attendanceRecords,
+    loading,
+    error,
+    addStudent,
+    addCourse,
+    createSession,
+    updateSession,
+    markAttendance,
+    initializeDefaultData
+  } = useSupabaseData();
 
   // Initialize default data on first load
   useEffect(() => {
-    if (students.length === 0) {
-      const initialStudents = defaultStudents.map(student => ({
-        ...student,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString()
-      }));
-      setStudents(initialStudents);
-    }
+    const initializeData = async () => {
+      if (!loading && !isInitialized) {
+        try {
+          await initializeDefaultData();
+          setIsInitialized(true);
+        } catch (error) {
+          console.error('Failed to initialize data:', error);
+        }
+      }
+    };
 
-    if (courses.length === 0) {
-      const initialCourses = defaultCourses.map(course => ({
-        ...course,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString()
-      }));
-      setCourses(initialCourses);
+    initializeData();
+  }, [loading, isInitialized, initializeDefaultData]);
+
+  // Show loading screen while initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading FCFJ Attendance System...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error screen if database connection fails
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-600 text-2xl">⚠️</span>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Database Connection Error</h2>
+          <p className="text-gray-600 mb-4">
+            Unable to connect to the database. Please check your internet connection and try again.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Error: {error}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
     }
-  }, [students.length, courses.length, setStudents, setCourses]);
 
   const handleLogin = (matricNumber: string, role: 'admin' | 'student') => {
     if (role === 'admin') {
@@ -76,82 +119,76 @@ function App() {
   };
 
   // Student management
-  const handleAddStudent = (studentData: Omit<Student, 'id' | 'createdAt'>) => {
-    const newStudent: Student = {
-      ...studentData,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString()
-    };
-    setStudents([...students, newStudent]);
-  };
-
-  const handleUpdateStudent = (id: string, updates: Partial<Student>) => {
-    setStudents(students.map(student => 
-      student.id === id ? { ...student, ...updates } : student
-    ));
-  };
-
-  const handleDeleteStudent = (id: string) => {
-    if (confirm('Are you sure you want to delete this student?')) {
-      setStudents(students.filter(student => student.id !== id));
-      setAttendanceRecords(attendanceRecords.filter(record => record.studentId !== id));
+  const handleAddStudent = async (studentData: Omit<Student, 'id' | 'createdAt'>) => {
+    try {
+      await addStudent(studentData);
+    } catch (error) {
+      console.error('Error adding student:', error);
+      alert('Failed to add student. Please try again.');
     }
+  };
+
+  const handleUpdateStudent = async (id: string, updates: Partial<Student>) => {
+    // TODO: Implement update student in Supabase
+    console.log('Update student:', id, updates);
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    // TODO: Implement delete student in Supabase
+    console.log('Delete student:', id);
   };
 
   // Course management
-  const handleAddCourse = (courseData: Omit<Course, 'id' | 'createdAt'>) => {
-    const newCourse: Course = {
-      ...courseData,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString()
-    };
-    setCourses([...courses, newCourse]);
-  };
-
-  const handleUpdateCourse = (id: string, updates: Partial<Course>) => {
-    setCourses(courses.map(course => 
-      course.id === id ? { ...course, ...updates } : course
-    ));
-  };
-
-  const handleDeleteCourse = (id: string) => {
-    if (confirm('Are you sure you want to delete this course?')) {
-      setCourses(courses.filter(course => course.id !== id));
-      setAttendanceSessions(attendanceSessions.filter(session => session.courseId !== id));
-      setAttendanceRecords(attendanceRecords.filter(record => {
-        const session = attendanceSessions.find(s => s.id === record.sessionId);
-        return session?.courseId !== id;
-      }));
+  const handleAddCourse = async (courseData: Omit<Course, 'id' | 'createdAt'>) => {
+    try {
+      await addCourse(courseData);
+    } catch (error) {
+      console.error('Error adding course:', error);
+      alert('Failed to add course. Please try again.');
     }
   };
 
-  // Session management
-  const handleCreateSession = (sessionData: Omit<AttendanceSession, 'id' | 'createdAt'>) => {
-    const newSession: AttendanceSession = {
-      ...sessionData,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString()
-    };
-    setAttendanceSessions([...attendanceSessions, newSession]);
+  const handleUpdateCourse = async (id: string, updates: Partial<Course>) => {
+    // TODO: Implement update course in Supabase
+    console.log('Update course:', id, updates);
   };
 
-  const handleUpdateSession = (id: string, updates: Partial<AttendanceSession>) => {
-    setAttendanceSessions(attendanceSessions.map(session =>
-      session.id === id ? { ...session, ...updates } : session
-    ));
+  const handleDeleteCourse = async (id: string) => {
+    // TODO: Implement delete course in Supabase
+    console.log('Delete course:', id);
+  };
+
+  // Session management
+  const handleCreateSession = async (sessionData: Omit<AttendanceSession, 'id' | 'createdAt'>) => {
+    try {
+      await createSession(sessionData);
+    } catch (error) {
+      console.error('Error creating session:', error);
+      alert('Failed to create session. Please try again.');
+    }
+  };
+
+  const handleUpdateSession = async (id: string, updates: Partial<AttendanceSession>) => {
+    try {
+      await updateSession(id, updates);
+    } catch (error) {
+      console.error('Error updating session:', error);
+      alert('Failed to update session. Please try again.');
+    }
   };
 
   // Attendance management
-  const handleMarkAttendance = (recordData: Omit<AttendanceRecord, 'id'>) => {
-    const newRecord: AttendanceRecord = {
-      ...recordData,
-      id: crypto.randomUUID()
-    };
-    setAttendanceRecords([...attendanceRecords, newRecord]);
+  const handleMarkAttendance = async (recordData: Omit<AttendanceRecord, 'id'>) => {
+    try {
+      await markAttendance(recordData);
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+      alert('Failed to mark attendance. Please try again.');
+    }
   };
 
   // Student attendance marking
-  const handleStudentMarkAttendance = (sessionId: string, studentId: string) => {
+  const handleStudentMarkAttendance = async (sessionId: string, studentId: string) => {
     const session = attendanceSessions.find(s => s.id === sessionId);
     const student = students.find(s => s.id === studentId);
     
@@ -161,7 +198,7 @@ function App() {
     const sessionStart = new Date(`${session.date} ${session.startTime}`);
     const isLate = now > new Date(sessionStart.getTime() + 15 * 60000); // 15 minutes late
 
-    handleMarkAttendance({
+    await handleMarkAttendance({
       sessionId,
       studentId,
       matricNumber: student.matricNumber,
