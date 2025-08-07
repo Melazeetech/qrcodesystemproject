@@ -9,12 +9,11 @@ import AttendancePage from './components/AttendancePage';
 import ReportsPage from './components/ReportsPage';
 import HowToUse from './components/HowToUse';
 import TestingHelper from './components/TestingHelper';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { Student, Course, AttendanceSession, AttendanceRecord, User } from './types';
 
 function App() {
-  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('fcfj-current-user', null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showHowToUse, setShowHowToUse] = useState(false);
   const [showTesting, setShowTesting] = useState(false);
@@ -33,8 +32,30 @@ function App() {
     createSession,
     updateSession,
     markAttendance,
-    initializeDefaultData
+    initializeDefaultData,
+    refreshData
   } = useSupabaseData();
+
+  // Load current user from localStorage
+  useEffect(() => {
+    const savedUser = localStorage.getItem('fcfj-current-user');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+      }
+    }
+  }, []);
+
+  // Save current user to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('fcfj-current-user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('fcfj-current-user');
+    }
+  }, [currentUser]);
 
   // Initialize default data on first load
   useEffect(() => {
@@ -43,6 +64,8 @@ function App() {
         try {
           await initializeDefaultData();
           setIsInitialized(true);
+          // Refresh data after initialization
+          await refreshData();
         } catch (error) {
           console.error('Failed to initialize data:', error);
         }
@@ -50,7 +73,7 @@ function App() {
     };
 
     initializeData();
-  }, [loading, isInitialized, initializeDefaultData]);
+  }, [loading, isInitialized, initializeDefaultData, refreshData]);
 
   // Show loading screen while initializing
   if (loading) {
