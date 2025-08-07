@@ -82,6 +82,11 @@ export default function StudentDashboard({
     setScanResult({ success: true, message: 'Attendance marked successfully!' });
     setScannedCode('');
     setShowScanner(false);
+    
+    // Show success alert
+    setTimeout(() => {
+      alert('✅ Attendance marked successfully!');
+    }, 100);
   };
 
   return (
