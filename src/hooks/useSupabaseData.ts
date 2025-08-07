@@ -302,6 +302,7 @@ export function useSupabaseData() {
 
       if (existingStudents && existingStudents.length > 0) {
         console.log('Default data already exists')
+        await loadAllData()
         return
       }
 
