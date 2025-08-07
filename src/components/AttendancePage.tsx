@@ -32,11 +32,13 @@ export default function AttendancePage({
 
   const handleStartSession = (session: AttendanceSession) => {
     const qrCode = generateSessionQR(session.id);
+    console.log('Generated QR Code:', qrCode); // Debug log
     onUpdateSession(session.id, { 
       isActive: true, 
       qrCode 
     });
     setSelectedSession({ ...session, isActive: true, qrCode });
+    alert(`✅ Session started! QR Code: ${qrCode}`);
   };
 
   const handleStopSession = (session: AttendanceSession) => {
@@ -79,7 +81,7 @@ export default function AttendancePage({
     });
 
     setScannedMatric('');
-    alert(`Attendance marked for ${student.firstName} ${student.lastName}!`);
+    alert(`✅ Attendance marked for ${student.firstName} ${student.lastName}!`);
   };
 
   const getSessionAttendance = (sessionId: string) => {
