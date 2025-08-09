@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { User, BookOpen, CheckCircle, AlertTriangle, Calendar, Clock, TrendingUp, LogOut, Camera, QrCode } from 'lucide-react';
 import { Student, Course, AttendanceRecord, AttendanceSession } from '../types';
 import { calculateAttendanceStats } from '../utils/attendance';
+import { parseQRCode } from '../utils/qrCode';
+import QRScanner from './QRScanner';
 
 interface StudentDashboardProps {
   student: Student;
@@ -21,7 +23,6 @@ export default function StudentDashboard({
   onMarkAttendance
 }: StudentDashboardProps) {
   const [showScanner, setShowScanner] = useState(false);
-  const [scannedCode, setScannedCode] = useState('');
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Get courses for student's level
@@ -53,17 +54,31 @@ export default function StudentDashboard({
     session.isActive && studentCourses.some(course => course.id === session.courseId)
   );
 
-  const handleQRScan = () => {
-    if (!scannedCode.trim()) {
-      setScanResult({ success: false, message: 'Please enter a valid QR code' });
+  const handleQRScan = (qrCodeData: string) => {
+    console.log('Scanned QR Code:', qrCodeData);
+    
+    // Parse the QR code data
+    const parsedData = parseQRCode(qrCodeData);
+    
+    if (!parsedData) {
+      setScanResult({ success: false, message: 'Invalid QR code format' });
       return;
     }
 
-    // Find active session matching the QR code
-    const session = activeSessions.find(s => s.qrCode === scannedCode);
+    // Find active session matching the parsed session ID
+    const session = activeSessions.find(s => s.id === parsedData.sessionId);
     
     if (!session) {
-      setScanResult({ success: false, message: 'Invalid or expired QR code' });
+      setScanResult({ success: false, message: 'Session not found or not active' });
+      return;
+    }
+
+    // Check if QR code is expired (15 minutes)
+    const now = Date.now();
+    const diffMinutes = (now - parsedData.timestamp) / (1000 * 60);
+    
+    if (diffMinutes > 15) {
+      setScanResult({ success: false, message: 'QR code has expired (15 minute limit)' });
       return;
     }
 
@@ -80,8 +95,6 @@ export default function StudentDashboard({
     // Mark attendance
     onMarkAttendance(session.id, student.id);
     setScanResult({ success: true, message: 'Attendance marked successfully!' });
-    setScannedCode('');
-    setShowScanner(false);
     
     // Show success alert
     setTimeout(() => {
@@ -262,96 +275,13 @@ export default function StudentDashboard({
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Mark Attendance</h3>
               
-              {!showScanner ? (
-                <button
-                  onClick={() => setShowScanner(true)}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <QrCode className="w-5 h-5" />
-                  <span>Scan QR Code</span>
-                </button>
-              ) : (
-                <div className="space-y-4">
-                  {/* Camera Simulation */}
-                  <div className="relative bg-gray-900 rounded-lg overflow-hidden">
-                    <video
-                      ref={(video) => {
-                        if (video && !video.srcObject) {
-                          navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                            .then(stream => {
-                              video.srcObject = stream;
-                              video.play();
-                            })
-                            .catch(() => {
-                              // Fallback to front camera if back camera fails
-                              navigator.mediaDevices.getUserMedia({ video: true })
-                                .then(stream => {
-                                  video.srcObject = stream;
-                                  video.play();
-                                })
-                                .catch(() => {
-                                  // Show fallback UI if camera access fails
-                                  video.style.display = 'none';
-                                  const fallback = video.parentElement?.querySelector('.camera-fallback');
-                                  if (fallback) fallback.style.display = 'block';
-                                });
-                            });
-                        }
-                      }}
-                      className="w-full h-64 object-cover"
-                      autoPlay
-                      playsInline
-                      muted
-                    />
-                    <div className="camera-fallback absolute inset-0 bg-gray-800 flex flex-col items-center justify-center text-white" style={{ display: 'none' }}>
-                      <Camera className="w-16 h-16 mb-4" />
-                      <p className="text-sm mb-2">Camera not available</p>
-                      <p className="text-xs text-gray-400">Use manual input below</p>
-                    </div>
-                    {/* QR Code scanning overlay */}
-                    <div className="absolute inset-4 border-2 border-green-400 rounded-lg pointer-events-none"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-green-400 rounded-lg animate-pulse pointer-events-none"></div>
-                    <div className="absolute bottom-4 left-4 right-4 text-center">
-                      <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1">
-                        Position QR code within the green frame
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Manual Input */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Or enter QR code manually:
-                    </label>
-                    <input
-                      type="text"
-                      value={scannedCode}
-                      onChange={(e) => setScannedCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter QR code"
-                    />
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setShowScanner(false);
-                        setScannedCode('');
-                        setScanResult(null);
-                      }}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleQRScan}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Submit
-                    </button>
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={() => setShowScanner(true)}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <QrCode className="w-5 h-5" />
+                <span>Scan QR Code</span>
+              </button>
 
               {scanResult && (
                 <div className={`mt-4 p-3 rounded-lg ${
@@ -368,6 +298,13 @@ export default function StudentDashboard({
                 </div>
               )}
             </div>
+
+            {/* QR Scanner Modal */}
+            <QRScanner
+              isOpen={showScanner}
+              onScan={handleQRScan}
+              onClose={() => setShowScanner(false)}
+            />
 
             {/* Active Sessions */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

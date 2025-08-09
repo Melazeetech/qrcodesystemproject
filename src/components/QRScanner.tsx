@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, Type } from 'lucide-react';
+import QrScanner from 'qr-scanner';
 
 interface QRScannerProps {
   onScan: (result: string) => void;
@@ -9,85 +10,71 @@ interface QRScannerProps {
 
 export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [qrScanner, setQrScanner] = useState<QrScanner | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualInput, setManualInput] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      startCamera();
+    if (isOpen && videoRef.current) {
+      startScanner();
     } else {
-      stopCamera();
+      stopScanner();
     }
 
-    return () => stopCamera();
+    return () => stopScanner();
   }, [isOpen]);
 
-  const startCamera = async () => {
+  const startScanner = async () => {
+    if (!videoRef.current) return;
+    
     setError('');
     setCameraReady(false);
     
     try {
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported on this device');
-      }
+      const scanner = new QrScanner(
+        videoRef.current,
+        (result) => {
+          console.log('QR Code detected:', result.data);
+          onScan(result.data);
+          onClose();
+        },
+        {
+          onDecodeError: (err) => {
+            // Ignore decode errors - they happen when no QR code is visible
+            console.log('Decode error (normal):', err);
+          },
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          preferredCamera: 'environment', // Use back camera
+        }
+      );
 
-      let mediaStream;
+      await scanner.start();
+      setQrScanner(scanner);
+      setCameraReady(true);
       
-      try {
-        // Try back camera first (better for QR scanning)
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
-      } catch (backCameraError) {
-        console.log('Back camera not available, trying front camera');
-        // Fallback to front camera
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
-      }
-
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().then(() => {
-            setCameraReady(true);
-          }).catch((playError) => {
-            console.error('Error playing video:', playError);
-            setError('Failed to start camera preview');
-          });
-        };
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setError('Camera access denied. Please allow camera permissions and try again.');
+    } catch (error: any) {
+      console.error('Error starting QR scanner:', error);
+      setError('Camera access denied or not available. Please use manual input.');
+      setShowManualInput(true);
     }
   };
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+  const stopScanner = () => {
+    if (qrScanner) {
+      qrScanner.stop();
+      qrScanner.destroy();
+      setQrScanner(null);
     }
     setCameraReady(false);
     setError('');
   };
 
-  const handleManualInput = () => {
-    const input = prompt('Enter QR code manually:');
-    if (input && input.trim()) {
-      onScan(input.trim());
+  const handleManualSubmit = () => {
+    if (manualInput.trim()) {
+      onScan(manualInput.trim());
       onClose();
     }
   };
@@ -95,9 +82,9 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-4 max-w-md w-full mx-4">
-        <div className="flex justify-between items-center mb-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full mx-4">
+        <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold">Scan QR Code</h3>
           <button
             onClick={onClose}
@@ -107,68 +94,85 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
           </button>
         </div>
 
-        <div className="relative bg-black rounded-lg overflow-hidden mb-4">
-          {error ? (
-            <div className="h-64 flex flex-col items-center justify-center text-white bg-red-900">
-              <Camera className="w-16 h-16 mb-4" />
-              <p className="text-sm text-center px-4">{error}</p>
-              <button
-                onClick={handleManualInput}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Manual Input
-              </button>
-            </div>
-          ) : !cameraReady ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gray-800">
-              <Camera className="w-16 h-16 mb-4" />
-              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
-              <p className="text-sm">Starting camera...</p>
-            </div>
-          ) : null}
-          
-          <video
-            ref={videoRef}
-            className="w-full h-64 object-cover"
-            autoPlay
-            playsInline
-            muted
-            style={{ display: cameraReady ? 'block' : 'none' }}
-          />
-          
-          {cameraReady && (
+        <div className="p-4">
+          {!showManualInput ? (
             <>
-              {/* Scanning overlay */}
-              <div className="absolute inset-4 border-2 border-green-400 rounded-lg"></div>
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-green-400 rounded-lg animate-pulse"></div>
-              
-              <div className="absolute bottom-4 left-4 right-4 text-center">
-                <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1">
-                  Position QR code in the green frame
+              <div className="relative bg-black rounded-lg overflow-hidden mb-4">
+                {error ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-white bg-red-900">
+                    <Camera className="w-16 h-16 mb-4" />
+                    <p className="text-sm text-center px-4 mb-4">{error}</p>
+                    <button
+                      onClick={() => setShowManualInput(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Use Manual Input
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      className="w-full h-64 object-cover"
+                      style={{ display: cameraReady ? 'block' : 'none' }}
+                    />
+                    
+                    {!cameraReady && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gray-800">
+                        <Camera className="w-16 h-16 mb-4" />
+                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <p className="text-sm">Starting camera...</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="text-center mb-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  Point your camera at the QR code displayed by your lecturer
                 </p>
+                <button
+                  onClick={() => setShowManualInput(true)}
+                  className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <Type className="w-4 h-4 mr-2" />
+                  Manual Input
+                </button>
               </div>
             </>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter QR Code Data:
+                </label>
+                <textarea
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  rows={3}
+                  placeholder="Paste the QR code data here..."
+                />
+              </div>
+              
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowManualInput(false)}
+                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Back to Camera
+                </button>
+                <button
+                  onClick={handleManualSubmit}
+                  disabled={!manualInput.trim()}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
           )}
-        </div>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600 mb-4">
-            Point your camera at the QR code displayed by your lecturer
-          </p>
-          <div className="flex space-x-2">
-            <button
-              onClick={handleManualInput}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Manual Input
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       </div>
     </div>

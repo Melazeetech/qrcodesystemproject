@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { QrCode, Camera, CheckCircle, Clock, MapPin, Play, Square } from 'lucide-react';
 import { Course, AttendanceSession, Student, AttendanceRecord } from '../types';
-import { generateSessionQR } from '../utils/qrCode';
+import { generateSessionQR, generateQRCodeImage } from '../utils/qrCode';
 
 interface AttendancePageProps {
   courses: Course[];
@@ -23,6 +23,7 @@ export default function AttendancePage({
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedSession, setSelectedSession] = useState<AttendanceSession | null>(null);
   const [scannedMatric, setScannedMatric] = useState('');
+  const [qrCodeImage, setQrCodeImage] = useState<string>('');
 
   const courseSessions = selectedCourse 
     ? attendanceSessions.filter(s => s.courseId === selectedCourse)
@@ -30,15 +31,18 @@ export default function AttendancePage({
 
   const activeSessions = attendanceSessions.filter(s => s.isActive);
 
-  const handleStartSession = (session: AttendanceSession) => {
+  const handleStartSession = async (session: AttendanceSession) => {
     const qrCode = generateSessionQR(session.id);
-    console.log('Generated QR Code:', qrCode); // Debug log
+    
+    // Generate actual QR code image
+    const qrImageData = await generateQRCodeImage(qrCode);
+    setQrCodeImage(qrImageData);
+    
     onUpdateSession(session.id, { 
       isActive: true, 
       qrCode 
     });
     setSelectedSession({ ...session, isActive: true, qrCode });
-    alert(`✅ Session started! QR Code: ${qrCode}`);
   };
 
   const handleStopSession = (session: AttendanceSession) => {
@@ -46,6 +50,7 @@ export default function AttendancePage({
     if (selectedSession?.id === session.id) {
       setSelectedSession({ ...session, isActive: false });
     }
+    setQrCodeImage('');
   };
 
   const handleManualAttendance = () => {
@@ -253,34 +258,37 @@ export default function AttendancePage({
                     QR Code - Week {selectedSession.week}
                   </h3>
                   <div className="text-center">
-                    <div className="inline-block p-8 bg-gray-100 rounded-lg mb-4">
-                      <div className="w-48 h-48 bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center relative overflow-hidden">
-                        {/* QR Code Pattern Simulation */}
-                        <div className="absolute inset-2 grid grid-cols-8 gap-1">
-                          {Array.from({ length: 64 }, (_, i) => (
-                            <div
-                              key={i}
-                              className={`aspect-square ${
-                                Math.random() > 0.5 ? 'bg-black' : 'bg-white'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
+                    <div className="inline-block p-6 bg-white border-4 border-green-500 rounded-lg mb-4 shadow-lg">
+                      {qrCodeImage ? (
+                        <img 
+                          src={qrCodeImage} 
+                          alt="QR Code for Attendance" 
+                          className="w-80 h-80 mx-auto"
+                        />
+                      ) : (
+                        <div className="w-80 h-80 bg-gray-100 flex items-center justify-center">
                           <div className="text-center">
-                            <QrCode className="w-16 h-16 text-gray-600 mx-auto mb-2" />
-                            <p className="text-xs text-gray-600 font-mono">
-                              {selectedSession.qrCode?.slice(0, 8)}...
-                            </p>
+                            <QrCode className="w-16 h-16 text-gray-400 mx-auto mb-2" />
+                            <p className="text-gray-500">Generating QR Code...</p>
                           </div>
                         </div>
+                      )}
                       </div>
                     </div>
                     <p className="text-sm text-gray-600 mb-4">
                       Students can scan this QR code to mark their attendance
                     </p>
-                    <p className="text-xs text-gray-500 mb-4">
-                      QR Code: <span className="font-mono">{selectedSession.qrCode}</span>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                      <p className="text-sm font-medium text-green-800 mb-1">Session Details:</p>
+                      <p className="text-xs text-green-700">
+                        Course: {courses.find(c => c.id === selectedSession.courseId)?.code} - Week {selectedSession.week}
+                      </p>
+                      <p className="text-xs text-green-700">
+                        Time: {selectedSession.startTime} - {selectedSession.endTime}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4 font-mono bg-gray-50 p-2 rounded">
+                      Debug Code: {selectedSession.qrCode?.slice(0, 20)}...
                     </p>
                     
                     {/* Manual Attendance */}
@@ -303,7 +311,6 @@ export default function AttendancePage({
                       </div>
                     </div>
                   </div>
-                </div>
               )}
             </div>
           ) : (
