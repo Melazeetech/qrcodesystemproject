@@ -37,11 +37,9 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
 
   const startScanner = async () => {
     if (!videoRef.current) return;
-
     setError('');
     setCameraReady(false);
 
-    // Check HTTPS requirement
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
       setError('Camera access requires HTTPS. Please use a secure connection.');
       setShowManualInput(true);
@@ -59,25 +57,16 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
           onClose();
         },
         {
-          onDecodeError: (err) => {
-            console.log('Decode error (normal):', err);
-          },
+          onDecodeError: (err) => console.log('Decode error (normal):', err),
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: 'environment',
-          maxScansPerSecond: 5,
         }
       );
 
       await scanner.start();
-
-      // Force facing mode for mobile
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      videoRef.current.srcObject = stream;
-
       setQrScanner(scanner);
       setCameraReady(true);
-
     } catch (error: any) {
       console.error('Error starting QR scanner:', error);
       setError(error.message || 'Camera access denied or not available. Please use manual input.');
@@ -134,6 +123,9 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
                     <video
                       ref={videoRef}
                       className="w-full h-64 object-cover"
+                      playsInline
+                      autoPlay
+                      muted
                       style={{ display: cameraReady ? 'block' : 'none' }}
                     />
 
