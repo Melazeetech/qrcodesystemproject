@@ -22,17 +22,35 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
     } else {
       stopScanner();
     }
-
     return () => stopScanner();
   }, [isOpen]);
 
+  const checkCameraAccess = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasCamera = devices.some(device => device.kind === 'videoinput');
+      if (!hasCamera) throw new Error('No camera detected.');
+    } catch {
+      throw new Error('Camera permission denied or unavailable.');
+    }
+  };
+
   const startScanner = async () => {
     if (!videoRef.current) return;
-    
+
     setError('');
     setCameraReady(false);
-    
+
+    // Check HTTPS requirement
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setError('Camera access requires HTTPS. Please use a secure connection.');
+      setShowManualInput(true);
+      return;
+    }
+
     try {
+      await checkCameraAccess();
+
       const scanner = new QrScanner(
         videoRef.current,
         (result) => {
@@ -42,22 +60,27 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
         },
         {
           onDecodeError: (err) => {
-            // Ignore decode errors - they happen when no QR code is visible
             console.log('Decode error (normal):', err);
           },
           highlightScanRegion: true,
           highlightCodeOutline: true,
-          preferredCamera: 'environment', // Use back camera
+          preferredCamera: 'environment',
+          maxScansPerSecond: 5,
         }
       );
 
       await scanner.start();
+
+      // Force facing mode for mobile
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      videoRef.current.srcObject = stream;
+
       setQrScanner(scanner);
       setCameraReady(true);
-      
+
     } catch (error: any) {
       console.error('Error starting QR scanner:', error);
-      setError('Camera access denied or not available. Please use manual input.');
+      setError(error.message || 'Camera access denied or not available. Please use manual input.');
       setShowManualInput(true);
     }
   };
@@ -86,10 +109,7 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
       <div className="bg-white rounded-lg max-w-md w-full mx-4">
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold">Scan QR Code</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -116,7 +136,7 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
                       className="w-full h-64 object-cover"
                       style={{ display: cameraReady ? 'block' : 'none' }}
                     />
-                    
+
                     {!cameraReady && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gray-800">
                         <Camera className="w-16 h-16 mb-4" />
@@ -155,7 +175,7 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
                   placeholder="Paste the QR code data here..."
                 />
               </div>
-              
+
               <div className="flex space-x-2">
                 <button
                   onClick={() => setShowManualInput(false)}
