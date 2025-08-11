@@ -34,11 +34,21 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
     } else if (!isOpen) {
       stopScanner();
     }
-
     return () => stopScanner();
   }, [isOpen, hasTriedCamera, cameraReady, error]);
 
+  const checkCameraAccess = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasCamera = devices.some(device => device.kind === 'videoinput');
+      if (!hasCamera) throw new Error('No camera detected.');
+    } catch {
+      throw new Error('Camera permission denied or unavailable.');
+    }
+  };
+
   const startScanner = async () => {
+<<<<<<< HEAD
     if (!videoRef.current || hasTriedCamera) return;
     
     setError('');
@@ -74,6 +84,20 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
       } catch (permissionError) {
         throw new Error('Camera permission denied or camera not available');
       }
+=======
+    if (!videoRef.current) return;
+    setError('');
+    setCameraReady(false);
+
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setError('Camera access requires HTTPS. Please use a secure connection.');
+      setShowManualInput(true);
+      return;
+    }
+
+    try {
+      await checkCameraAccess();
+>>>>>>> 25a63dba7d54ca3159379500ccaf83c10a5dfd10
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -83,13 +107,11 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
           onClose();
         },
         {
-          onDecodeError: (err) => {
-            // Ignore decode errors - they happen when no QR code is visible
-            console.log('Decode error (normal):', err);
-          },
+          onDecodeError: (err) => console.log('Decode error (normal):', err),
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: 'environment',
+<<<<<<< HEAD
           maxScansPerSecond: 5,
           calculateScanRegion: (video) => {
             // Create a centered square scan region
@@ -102,12 +124,15 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
               height: scanSize,
             };
           },
+=======
+>>>>>>> 25a63dba7d54ca3159379500ccaf83c10a5dfd10
         }
       );
 
       await scanner.start();
       setQrScanner(scanner);
       setCameraReady(true);
+<<<<<<< HEAD
       setIsInitializing(false);
       
     } catch (error: any) {
@@ -127,6 +152,11 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
       }
       
       setError(errorMessage);
+=======
+    } catch (error: any) {
+      console.error('Error starting QR scanner:', error);
+      setError(error.message || 'Camera access denied or not available. Please use manual input.');
+>>>>>>> 25a63dba7d54ca3159379500ccaf83c10a5dfd10
       setShowManualInput(true);
     }
   };
@@ -165,10 +195,7 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
       <div className="bg-white rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold">Scan QR Code</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -201,12 +228,20 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
                     <video
                       ref={videoRef}
                       className="w-full h-64 object-cover"
+                      playsInline
+                      autoPlay
+                      muted
                       style={{ display: cameraReady ? 'block' : 'none' }}
                       playsInline
                       muted
                     />
+<<<<<<< HEAD
                     
                     {(isInitializing || !cameraReady) && (
+=======
+
+                    {!cameraReady && (
+>>>>>>> 25a63dba7d54ca3159379500ccaf83c10a5dfd10
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gray-800">
                         <Camera className="w-16 h-16 mb-4" />
                         <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
@@ -292,7 +327,7 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
                   placeholder="Paste the QR code data here..."
                 />
               </div>
-              
+
               <div className="flex space-x-2">
                 <button
                   onClick={() => setShowManualInput(false)}
