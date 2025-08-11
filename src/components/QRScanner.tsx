@@ -88,11 +88,15 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
           setShowManualInput(true);
         }
       };
-
-      startScanner();
+      
+      // Delay the start of the scanner slightly to ensure the video element is ready.
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 100);
 
       // Cleanup function to stop and destroy the scanner when the modal closes
       return () => {
+        clearTimeout(timer);
         if (qrScanner) {
           qrScanner.stop();
           qrScanner.destroy();
@@ -105,7 +109,10 @@ export default function QRScanner({ onScan, onClose, isOpen }: QRScannerProps) {
       qrScanner.destroy();
       setQrScanner(null);
     }
-  }, [isOpen, onScan, onClose, qrScanner]); // The effect re-runs when isOpen changes
+    
+    // The dependency array now only includes isOpen and the refs, which don't change
+    // This prevents the effect from re-running in an infinite loop
+  }, [isOpen, videoRef, onScan, onClose]); 
 
   // Function to handle the manual form submission
   const handleManualSubmit = () => {
