@@ -291,6 +291,17 @@ export default function AttendancePage({
                       Debug Code: {selectedSession.qrCode?.slice(0, 20)}...
                     </p>
                     
+                    {/* Full QR Code for Manual Entry */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                      <h4 className="text-sm font-medium text-yellow-900 mb-2">For Manual Entry:</h4>
+                      <div className="bg-white p-2 rounded border text-xs font-mono break-all select-all">
+                        {selectedSession.qrCode}
+                      </div>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        Students can copy this code if camera doesn't work
+                      </p>
+                    </div>
+                    
                     {/* Manual Attendance */}
                     <div className="border-t pt-4 mt-4">
                       <h4 className="font-medium text-gray-900 mb-3">Manual Attendance</h4>

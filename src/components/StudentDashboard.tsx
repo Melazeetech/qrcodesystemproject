@@ -297,6 +297,13 @@ export default function StudentDashboard({
                   </div>
                 </div>
               )}
+
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-900 mb-1">Camera Issues?</h4>
+                <p className="text-xs text-blue-800">
+                  If camera doesn't work, use "Manual Input" and ask your lecturer for the QR code data.
+                </p>
+              </div>
             </div>
 
             {/* QR Scanner Modal */}

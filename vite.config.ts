@@ -6,9 +6,19 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true, // Allow external connections
-    port: 5173
+    port: 5173,
+    https: false // Set to true if you need HTTPS for local development
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'qr-scanner': ['qr-scanner']
+        }
+      }
+    }
+  }
 });
