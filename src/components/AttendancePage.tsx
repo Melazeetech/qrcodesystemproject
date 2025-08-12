@@ -89,6 +89,51 @@ export default function AttendancePage({
     alert(`✅ Attendance marked for ${student.firstName} ${student.lastName}!`);
   };
 
+  const handleQuickAttendance = async (session: AttendanceSession) => {
+    const course = courses.find(c => c.id === session.courseId);
+    if (!course) return;
+    
+    // Get students for this course level
+    const courseStudents = students.filter(s => s.level === course.level);
+    
+    if (courseStudents.length === 0) {
+      alert('No students found for this course level');
+      return;
+    }
+    
+    const alreadyMarked = attendanceRecords.filter(r => r.sessionId === session.id);
+    const studentsToMark = courseStudents.filter(s => 
+      !alreadyMarked.some(r => r.studentId === s.id)
+    );
+    
+    if (studentsToMark.length === 0) {
+      alert('All students have already been marked for this session');
+      return;
+    }
+    
+    if (confirm(`Mark attendance for ${studentsToMark.length} students in ${course.code}?`)) {
+      try {
+        for (const student of studentsToMark) {
+          await onMarkAttendance({
+            sessionId: session.id,
+            studentId: student.id,
+            matricNumber: student.matricNumber,
+            markedAt: new Date().toISOString(),
+            status: 'present',
+            location: session.location
+          });
+          
+          // Small delay to prevent overwhelming the database
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        alert(`✅ Marked attendance for ${studentsToMark.length} students!`);
+      } catch (error) {
+        console.error('Error marking bulk attendance:', error);
+        alert('Error marking attendance. Please try again.');
+      }
+    }
+  };
   const getSessionAttendance = (sessionId: string) => {
     const records = attendanceRecords.filter(r => r.sessionId === sessionId);
     return {
@@ -238,6 +283,13 @@ export default function AttendancePage({
                                 Start
                               </button>
                             )}
+                            <button
+                              onClick={() => handleQuickAttendance(session)}
+                              className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition-colors"
+                              title="Mark attendance for all students"
+                            >
+                              Quick Mark
+                            </button>
                           </div>
                         </div>
                       </div>
