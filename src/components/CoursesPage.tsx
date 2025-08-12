@@ -120,6 +120,49 @@ export default function CoursesPage({
     setShowSessionForm(null);
   };
 
+  const handleBulkCreateSessions = async (courseId: string) => {
+    const existingSessions = attendanceSessions.filter(s => s.courseId === courseId);
+    const startWeek = existingSessions.length + 1;
+    
+    if (startWeek > 15) {
+      alert('This course already has 15 or more sessions');
+      return;
+    }
+    
+    const sessionsToCreate = 15 - existingSessions.length;
+    
+    if (confirm(`Create ${sessionsToCreate} sessions for this course (Week ${startWeek} to Week 15)?`)) {
+      try {
+        for (let i = 0; i < sessionsToCreate; i++) {
+          const week = startWeek + i;
+          
+          // Calculate date for each week (starting from today)
+          const startDate = new Date();
+          startDate.setDate(startDate.getDate() + i * 7);
+          const sessionDate = startDate.toISOString().split('T')[0];
+          
+          await onCreateSession({
+            courseId,
+            week: week,
+            date: sessionDate,
+            startTime: '08:00',
+            endTime: '10:00',
+            location: `Lecture Hall ${Math.ceil(week / 5)}`,
+            qrCode: '',
+            isActive: false
+          });
+          
+          // Small delay to prevent overwhelming the database
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        alert(`Successfully created ${sessionsToCreate} sessions!`);
+      } catch (error) {
+        console.error('Error creating bulk sessions:', error);
+        alert('Error creating sessions. Please try again.');
+      }
+    }
+  };
   const getCourseSessions = (courseId: string) => {
     return attendanceSessions.filter(s => s.courseId === courseId).length;
   };
@@ -356,9 +399,16 @@ export default function CoursesPage({
 
               <button
                 onClick={() => setShowSessionForm(course.id)}
-                className="w-full px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                className="w-full px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors mb-2"
               >
                 Create Session
+              </button>
+              
+              <button
+                onClick={() => handleBulkCreateSessions(course.id)}
+                className="w-full px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+              >
+                Create 15 Sessions
               </button>
 
               {/* Session Form */}
