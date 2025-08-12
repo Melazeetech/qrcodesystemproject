@@ -350,6 +350,54 @@ export function useSupabaseData() {
         throw coursesError
       }
 
+      // Get inserted courses to create sessions
+      const { data: insertedCourses } = await supabase
+        .from('courses')
+        .select('*')
+
+      if (insertedCourses) {
+        // Create 15 sessions for each course
+        const sessionsData = []
+        
+        for (const course of insertedCourses) {
+          for (let week = 1; week <= 15; week++) {
+            // Calculate date for each week (starting from current date)
+            const startDate = new Date()
+            startDate.setDate(startDate.getDate() + (week - 1) * 7)
+            const sessionDate = startDate.toISOString().split('T')[0]
+            
+            // Generate QR code for session
+            const qrCode = btoa(JSON.stringify({
+              sessionId: `temp-${course.id}-week-${week}`,
+              timestamp: Date.now(),
+              type: 'attendance'
+            }))
+            
+            sessionsData.push({
+              course_id: course.id,
+              week: week,
+              date: sessionDate,
+              start_time: '08:00',
+              end_time: '10:00',
+              qr_code: qrCode,
+              is_active: false,
+              location: `Lecture Hall ${Math.ceil(week / 5)}`
+            })
+          }
+        }
+        
+        // Insert all sessions
+        const { error: sessionsError } = await supabase
+          .from('attendance_sessions')
+          .insert(sessionsData)
+          
+        if (sessionsError) {
+          console.error('Error inserting sessions:', sessionsError)
+          throw sessionsError
+        }
+        
+        console.log(`Created 15 sessions for each of ${insertedCourses.length} courses`)
+      }
       console.log('Default data initialized successfully')
       await loadAllData()
     } catch (error) {
