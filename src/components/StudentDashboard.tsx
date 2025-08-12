@@ -333,6 +333,11 @@ export default function StudentDashboard({
                             <Clock className="w-3 h-3" />
                             <span>{session.startTime} - {session.endTime}</span>
                           </div>
+                          {session.location && (
+                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                              <span>📍 {session.location}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="text-right">
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -341,6 +346,14 @@ export default function StudentDashboard({
                           </span>
                           {isMarked && (
                             <p className="text-xs text-green-600 mt-1">✓ Marked</p>
+                          )}
+                          {!isMarked && (
+                            <button
+                              onClick={() => setShowScanner(true)}
+                              className="text-xs text-blue-600 mt-1 hover:text-blue-800"
+                            >
+                              📱 Scan Now
+                            </button>
                           )}
                         </div>
                       </div>
